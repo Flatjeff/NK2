@@ -19,6 +19,20 @@ span[style*="overflow: hidden"] { display: block !important; width: 100% !import
   letter-spacing: 0.05em;
 }
 #admin-bar span { color: #ff6b6b; margin: 0 8px; }
+#admin-lang-btn {
+  display: inline-block;
+  margin-left: 24px;
+  padding: 2px 14px;
+  background: #e0e0ff;
+  color: #1a1a2e;
+  border: none;
+  border-radius: 12px;
+  font: 700 12px 'Arial', sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+  letter-spacing: 0.08em;
+}
+#admin-lang-btn:hover { background: #fff; }
 body.admin-mode { padding-top: 38px; }
 
 /* ── Highlight éléments éditables ── */
@@ -90,11 +104,17 @@ body.admin-mode [data-img-editable]:hover {
 /* Upload image */
 #admin-img-preview {
   max-width: 100%;
-  max-height: 200px;
+  max-height: 180px;
+  width: auto;
+  height: auto;
   display: block;
   margin: 10px auto;
   border: 1px solid #eee;
+  object-fit: contain;
 }
+/* Empêcher le popup de déborder sur l'image cliquée */
+#admin-overlay { align-items: center; }
+#admin-popup { overflow: hidden; }
 #admin-img-input { display: none; }
 #admin-img-btn {
   display: block;
@@ -159,7 +179,7 @@ body.admin-mode [data-img-editable]:hover {
 </style>
 
 <!-- Barre admin -->
-<div id="admin-bar">⚙ MODE ADMIN ACTIF — <span>Ctrl+M</span> pour sauvegarder et quitter</div>
+<div id="admin-bar">⚙ MODE ADMIN ACTIF — <span>Ctrl+M</span> pour sauvegarder et quitter<button id="admin-lang-btn">🌐 JP</button></div>
 
 <!-- Overlay popup édition -->
 <div id="admin-overlay">
@@ -243,11 +263,30 @@ body.admin-mode [data-img-editable]:hover {
   }
 
   // ── Activation mode admin ──────────────────────────────
+  // ── Langue courante ────────────────────────────────────────
+  // La page JP = index.html, FR = index-fr.html
+  const IS_FR = window.location.pathname.includes('index-fr');
+  let currentLang = IS_FR ? 'FR' : 'JP';
+
+  function updateLangBtn() {
+    const btn = document.getElementById('admin-lang-btn');
+    if (btn) btn.textContent = '🌐 ' + currentLang + ' → ' + (currentLang === 'JP' ? 'FR' : 'JP');
+  }
+
+  function switchLang() {
+    if (currentLang === 'JP') {
+      window.location.href = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/$/, '') + '/index-fr.html';
+    } else {
+      window.location.href = window.location.origin + window.location.pathname.replace('index-fr.html', 'index.html');
+    }
+  }
+
   function enterAdmin() {
     adminMode = true;
     tagEditables();
     document.getElementById('admin-bar').style.display = 'block';
     document.body.classList.add('admin-mode');
+    updateLangBtn();
     toast('Mode admin activé — cliquez sur un texte ou une image pour éditer');
   }
 
@@ -362,21 +401,24 @@ body.admin-mode [data-img-editable]:hover {
       // Stratégie : si l'élément contient un seul span "porteur" (c1, c3, c13…)
       // on réécrit son textContent sans toucher à la structure.
       // Sinon on remplace le contenu texte en conservant les noeuds non-texte (images, br).
+      function linesToHtml(lines) {
+        // Convertit les lignes en HTML : ligne vide = saut de paragraphe visuel
+        return lines.map((l, i) => {
+          if (l.trim() === '') return '<br>';        // ligne vide → saut visible
+          return i < lines.length - 1 ? l + '<br>' : l;
+        }).join('');
+      }
+
       function applyText(el, newText) {
         const lines = newText.split('\n');
-        // Chercher s'il y a un span principal portant tout le texte
         const spans = Array.from(el.querySelectorAll('span'));
         const mainSpan = spans.find(s => s.textContent.trim().length > 10 && !s.querySelector('span'));
 
         if (mainSpan && spans.length <= 3) {
-          // Réécrire uniquement le contenu du span principal
-          mainSpan.innerHTML = lines.map((l,i) => i < lines.length-1 ? l + '<br>' : l).join('');
+          mainSpan.innerHTML = linesToHtml(lines);
         } else {
-          // Remplacement complet du contenu textuel
-          // Conserver les noeuds img
           const imgs = Array.from(el.querySelectorAll('img')).map(i => i.cloneNode(true));
-          el.innerHTML = lines.map((l,i) => i < lines.length-1 ? l + '<br>' : l).join('');
-          // Réattacher les images si elles existaient
+          el.innerHTML = linesToHtml(lines);
           imgs.forEach(img => el.appendChild(img));
         }
       }
@@ -444,11 +486,13 @@ body.admin-mode [data-img-editable]:hover {
     const ts  = timestamp();
 
     try {
-      // 2. Écraser index.html
-      const ok1 = await pushFile('index.html', b64, `Admin save ${ts}`);
+      // 2. Écraser le fichier courant (JP ou FR)
+      const mainFile = IS_FR ? 'index-fr.html' : 'index.html';
+      const ok1 = await pushFile(mainFile, b64, `Admin save ${ts} (${currentLang})`);
 
-      // 3. Sauvegarder backup
-      const ok2 = await pushFile(`index-${ts}.html`, b64, `Backup ${ts}`);
+      // 3. Sauvegarder backup horodaté
+      const backupFile = IS_FR ? `index-fr-${ts}.html` : `index-${ts}.html`;
+      const ok2 = await pushFile(backupFile, b64, `Backup ${ts} (${currentLang})`);
 
       // 4. Upload images remplacées (stockées en data:)
       // (les images modifiées sont déjà inline en base64 dans le HTML — pas besoin de push séparé)
