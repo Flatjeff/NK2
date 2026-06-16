@@ -258,20 +258,23 @@ body.admin-mode [data-img-editable]:hover {
 
   // ── Tag des éléments éditables ─────────────────────────
   function tagEditables() {
-    // Texte : cibler les <p> et <span> qui contiennent du texte réel
-    // On exclut les éléments purement structurels (vides, ou ne contenant que des enfants block)
-    document.querySelectorAll('p, span, h1, h2, h3, h4').forEach(el => {
-      // Ignorer si l'élément ne contient aucun texte visible
-      if (el.textContent.trim().length < 2) return;
-      // Ignorer si c'est un conteneur d'image (contient un img ou span overflow:hidden)
-      if (el.querySelector('img, span[style*="overflow"]')) return;
-      // Ignorer si c'est un admin-bar ou popup
+    // Cibler les <p> et <td> contenant du texte, y compris via des spans imbriqués
+    document.querySelectorAll('p, td, h1, h2, h3, h4').forEach(el => {
+      const text = el.textContent.trim();
+      if (text.length < 2) return;
+      // Exclure les éléments de l'UI admin
       if (el.closest('#admin-bar, #admin-overlay, #token-popup, #admin-toast')) return;
+      // Exclure si ne contient que des images (wrappers visuels)
+      const allNodes = Array.from(el.querySelectorAll('*'));
+      const onlyImgWrappers = allNodes.every(n =>
+        n.tagName === 'IMG' || n.tagName === 'SPAN' && n.style && n.style.overflow === 'hidden'
+      );
+      if (onlyImgWrappers && el.querySelectorAll('img').length > 0 && text.length < 5) return;
       el.setAttribute('data-editable', '1');
     });
     // Images
     document.querySelectorAll('img').forEach(el => {
-      if (!el.src.includes('image4.png')) { // exclure les puces
+      if (!el.src.includes('image4.png')) {
         el.setAttribute('data-img-editable', '1');
       }
     });
