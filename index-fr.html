@@ -368,6 +368,11 @@ body.admin-mode [data-img-editable]:hover {
     pendingImageB64 = null;
     pendingImageName = null;
 
+    // Stocker le chemin original pour la sauvegarde
+    if (!img.getAttribute('data-filename')) {
+      img.setAttribute('data-filename', img.getAttribute('src'));
+    }
+
     document.getElementById('admin-popup-title').textContent = 'Remplacer l\'image';
     document.getElementById('admin-popup-body').innerHTML = `
       <p style="font:13px Arial,sans-serif;color:#555;margin-bottom:10px;">
@@ -476,43 +481,65 @@ body.admin-mode [data-img-editable]:hover {
 
   async function saveToGitHub() {
     toast('⏳ Sauvegarde en cours…', 60000);
-
-    // 1. Sérialiser le HTML courant, nettoyer via regex (indépendant du DOM live)
-    let htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-    // Retirer les attributs data-editable et data-img-editable
-    htmlContent = htmlContent.replace(/ data-editable="1"/g, '');
-    htmlContent = htmlContent.replace(/ data-img-editable="1"/g, '');
-    // Cacher la barre admin dans le HTML sauvegardé
-    htmlContent = htmlContent.replace(
-      'id="admin-bar" style="display: block;"',
-      'id="admin-bar" style="display: none;"'
-    );
-    htmlContent = htmlContent.replace(
-      '<body class="admin-mode"',
-      '<body'
-    );
-    const b64 = btoa(unescape(encodeURIComponent(htmlContent)));
-    const ts  = timestamp();
+    const ts = timestamp();
 
     try {
-      // 2. Écraser le fichier courant (JP ou FR)
+      // ── 1. Extraire les images remplacées (src = data:...) ──────────
+      // On les upload comme fichiers séparés dans le repo
+      // et on remplace le src data: par le chemin images/imageX.png
+      const imgs = document.querySelectorAll('img[src^="data:"]');
+      for (const img of imgs) {
+        const originalSrc = img.getAttribute('data-original-src') || img.src;
+        // Récupérer le nom de fichier original (stocké en data-attr ou déduire)
+        const fileName = img.getAttribute('data-filename') || 'images/image_replaced_' + ts + '.png';
+        // Extraire le base64 pur (sans le préfixe data:image/...;base64,)
+        const b64img = img.src.split(',')[1];
+        if (b64img) {
+          const okImg = await pushFile(fileName, b64img, `Replace image ${fileName} ${ts}`);
+          if (okImg) {
+            // Remplacer le src data: par le chemin relatif
+            img.src = fileName;
+          }
+        }
+      }
+
+      // ── 2. Sérialiser le HTML proprement ────────────────────────────
+      let htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      // Nettoyer attributs admin
+      htmlContent = htmlContent.replace(/ data-editable="1"/g, '');
+      htmlContent = htmlContent.replace(/ data-img-editable="1"/g, '');
+      htmlContent = htmlContent.replace(/ data-original-src="[^"]*"/g, '');
+      htmlContent = htmlContent.replace(/ data-filename="[^"]*"/g, '');
+      htmlContent = htmlContent.replace('id="admin-bar" style="display: block;"',
+                                        'id="admin-bar" style="display: none;"');
+      htmlContent = htmlContent.replace('<body class="admin-mode"', '<body');
+
+      // ── 3. Encoder en base64 sans btoa (gère les caractères Unicode + gros fichiers) ──
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(htmlContent);
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      const b64html = btoa(binary);
+
+      // ── 4. Pousser index.html ────────────────────────────────────────
       const mainFile = IS_FR ? 'index-fr.html' : 'index.html';
-      const ok1 = await pushFile(mainFile, b64, `Admin save ${ts} (${currentLang})`);
+      const ok1 = await pushFile(mainFile, b64html, `Admin save ${ts} (${currentLang})`);
 
-      // 3. Sauvegarder backup horodaté
+      // ── 5. Backup horodaté ───────────────────────────────────────────
       const backupFile = IS_FR ? `index-fr-${ts}.html` : `index-${ts}.html`;
-      const ok2 = await pushFile(backupFile, b64, `Backup ${ts} (${currentLang})`);
-
-      // 4. Upload images remplacées (stockées en data:)
-      // (les images modifiées sont déjà inline en base64 dans le HTML — pas besoin de push séparé)
+      await pushFile(backupFile, b64html, `Backup ${ts} (${currentLang})`);
 
       if (ok1) {
-        toast(`✅ Sauvegardé — backup : index-${ts}.html`, 5000);
+        toast(`✅ Sauvegardé — backup : ${backupFile}`, 5000);
       } else {
-        toast('❌ Erreur lors de la sauvegarde', 5000);
+        toast('❌ Erreur lors de la sauvegarde GitHub', 5000);
       }
     } catch(err) {
-      toast('❌ Erreur réseau : ' + err.message, 5000);
+      toast('❌ Erreur : ' + err.message, 5000);
+      console.error('saveToGitHub error:', err);
     }
   }
 })();
