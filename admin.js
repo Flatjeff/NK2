@@ -281,84 +281,73 @@
   async function saveToGitHub() {
     toast('⏳ Sauvegarde en cours…', 60000);
     const ts = timestamp();
-    console.log('[S1] start, IS_FR=', IS_FR);
 
     try {
       const mainFile = IS_FR ? 'index-fr.html' : 'index.html';
       const apiUrl = 'https://api.github.com/repos/' + REPO + '/contents/' + mainFile;
 
-      console.log('[S2] fetching source from GitHub:', apiUrl);
+      // 1. Récupérer le source HTML depuis GitHub
       const resp = await fetch(apiUrl, {
         headers: { 'Authorization': 'token ' + ghToken }
       });
-      console.log('[S3] fetch status:', resp.status, resp.ok);
-      if (!resp.ok) throw new Error('GitHub fetch failed: ' + resp.status);
-
+      if (!resp.ok) throw new Error('GitHub read failed: ' + resp.status);
       const fileData = await resp.json();
       const fileSHA = fileData.sha;
-      console.log('[S4] file SHA:', fileSHA, 'content length:', fileData.content ? fileData.content.length : 0);
 
+      // 2. Décoder le source
       const srcB64 = fileData.content.replace(/\n/g, '');
       const srcBytes = Uint8Array.from(atob(srcB64), c => c.charCodeAt(0));
       let srcHtml = new TextDecoder('utf-8').decode(srcBytes);
-      console.log('[S5] srcHtml length:', srcHtml.length);
 
-      const bodyHTML = document.body.innerHTML;
-      console.log('[S6] body innerHTML length:', bodyHTML.length);
+      // 3. Récupérer le body modifié
+      let bodyHTML = document.body.innerHTML;
 
+      // 4. Nettoyer les attributs admin — split/join UNIQUEMENT (pas de regex avec ")
+      bodyHTML = bodyHTML.split(' data-editable="1"').join('');
+      bodyHTML = bodyHTML.split(' data-img-editable="1"').join('');
+      bodyHTML = bodyHTML.split(' admin-mode').join('');
+      bodyHTML = bodyHTML.split('style="display: block;"').join('style="display: none;"');
+      bodyHTML = bodyHTML.split('class="show"').join('class=""');
+
+      // 5. Injecter le body dans le source
       const bodyOpenMatch = srcHtml.match(/<body[^>]*>/);
+      if (!bodyOpenMatch) throw new Error('body tag not found in source');
       const bodyOpenEnd = srcHtml.indexOf(bodyOpenMatch[0]) + bodyOpenMatch[0].length;
       const bodyCloseStart = srcHtml.lastIndexOf('</body>');
-      console.log('[S7] body open end:', bodyOpenEnd, 'body close start:', bodyCloseStart);
+      if (bodyCloseStart < 0) throw new Error('closing body tag not found');
 
-      let cleanBody = bodyHTML;
-      cleanBody = cleanBody.split(' data-editable="1"').join('');
-      cleanBody = cleanBody.split(' data-img-editable="1"').join('');
-      cleanBody = cleanBody.split(' admin-mode').join('');
-      cleanBody = cleanBody.split('id="admin-bar" style="display: block;"').join('id="admin-bar" style="display: none;"');
-      cleanBody = cleanBody.split(' class="show"').join(' class=""');
-      console.log('[S8] cleanBody length:', cleanBody.length);
+      const newHtml = srcHtml.slice(0, bodyOpenEnd) + '\n' + bodyHTML + '\n' + srcHtml.slice(bodyCloseStart);
 
-      const newHtml = srcHtml.slice(0, bodyOpenEnd) + '\n' + cleanBody + '\n' + srcHtml.slice(bodyCloseStart);
-      console.log('[S9] newHtml length:', newHtml.length);
-
+      // 6. Encoder en base64 UTF-8
       const encoder = new TextEncoder();
       const bytes = encoder.encode(newHtml);
       let binary = '';
-      const chunkSize = 8192;
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      const chunk = 8192;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
       }
       const b64html = btoa(binary);
-      console.log('[S10] b64html length:', b64html.length);
 
+      // 7. Pousser index.html
       const pushResp = await fetch(apiUrl, {
         method: 'PUT',
-        headers: {
-          'Authorization': 'token ' + ghToken,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: 'Admin save ' + ts,
-          content: b64html,
-          sha: fileSHA,
-          branch: BRANCH
-        })
+        headers: { 'Authorization': 'token ' + ghToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Admin save ' + ts, content: b64html, sha: fileSHA, branch: BRANCH })
       });
-      console.log('[S11] push status:', pushResp.status, pushResp.ok);
 
+      // 8. Backup horodaté
       const backupFile = IS_FR ? 'index-fr-' + ts + '.html' : 'index-' + ts + '.html';
       await pushFile(backupFile, b64html, 'Backup ' + ts);
 
       if (pushResp.ok) {
-        toast('✅ Sauvegardé', 5000);
+        toast('✅ Sauvegardé — backup : ' + backupFile, 5000);
       } else {
         const errText = await pushResp.text();
-        console.error('[S12] push error:', errText);
+        console.error('[SAVE] error:', errText);
         toast('❌ Erreur GitHub : ' + pushResp.status, 5000);
       }
     } catch(err) {
-      console.error('[SAVE] ERROR:', err.name, err.message);
+      console.error('[SAVE] exception:', err.message);
       toast('❌ Erreur : ' + err.message, 5000);
     }
   }
