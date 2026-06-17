@@ -313,7 +313,7 @@
       await pushFile(backupFile, b64html, 'Backup ' + ts);
 
       if (ok1) {
-        toast('✅ Sauvegardé — backup : ' + backupFile, 5000);
+        toast('✅ Sauvegardé. Attendre 2-3 min puis Ctrl+Shift+R pour recharger.', 8000);
       } else {
         toast('❌ Erreur GitHub', 5000);
       }
