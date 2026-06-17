@@ -317,9 +317,9 @@ body.admin-mode{padding-top:38px}
       let htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
 
       // Nettoyer les attributs admin
-      htmlContent = htmlContent.replace(//g, '');
-      htmlContent = htmlContent.replace(//g, '');
-      htmlContent = htmlContent.replace(/]*"/g, '');
+      htmlContent = htmlContent.replace(/ data-editable="1"/g, '');
+      htmlContent = htmlContent.replace(/ data-img-editable="1"/g, '');
+      htmlContent = htmlContent.replace(/ data-filename="[^"]*"/g, '');
       htmlContent = htmlContent.replace('id="admin-bar" style="display: none;"',
                                         'id="admin-bar" style="display: none;"');
       htmlContent = htmlContent.replace('<body', '<body');
