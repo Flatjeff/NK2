@@ -36,14 +36,17 @@ body.admin-mode{padding-top:38px}
   const BRANCH = 'main';
   let adminMode = false;
 
-  // Token obfusqué XOR+base64 — clé : NK2_oplite_2026
-  function xorDecode(enc, key) {
+  // Token obfusqué ROT+base64
+  function rotDecode(enc, shift) {
     const raw = atob(enc);
-    return Array.from(raw).map((c,i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join('');
+    let out = '';
+    for (let i = 0; i < raw.length; i++) {
+      out += String.fromCharCode((raw.charCodeAt(i) - shift + 256) % 256);
+    }
+    return out;
   }
-  const _ENC = 'KSNCAAlDIFtHUjoLflFHCyBgLwVFJQwBIRFwQ2pueBN1GlwnAiICEA==';
-  const _KEY = 'NK2_oplite_2026';
-  let ghToken = xorDecode(_ENC, _KEY);
+  const _ENC = 'lpefjpVie2FiZpRofZKgdJqBn5lkeJSkc31xooeHZYd2dGKGnXqlpA==';
+  let ghToken = rotDecode(_ENC, 47);
   let currentTarget = null;
   let currentType   = null; // 'text' | 'image'
   let pendingImageB64 = null;
