@@ -401,39 +401,40 @@ body.admin-mode [data-img-editable]:hover {
   document.getElementById('admin-validate').addEventListener('click', () => {
     if (currentType === 'text' && currentTarget) {
       const raw = document.getElementById('admin-textarea').value.trim();
+      const lines = raw.split('\n');
 
-      // Stratégie : si l'élément contient un seul span "porteur" (c1, c3, c13…)
-      // on réécrit son textContent sans toucher à la structure.
-      // Sinon on remplace le contenu texte en conservant les noeuds non-texte (images, br).
       function linesToHtml(lines) {
-        // Convertit les lignes en HTML : ligne vide = saut de paragraphe visuel
         return lines.map((l, i) => {
-          if (l.trim() === '') return '<br>';        // ligne vide → saut visible
+          if (l.trim() === '') return '<br>';
           return i < lines.length - 1 ? l + '<br>' : l;
         }).join('');
       }
 
-      function applyText(el, newText) {
-        const lines = newText.split('\n');
-        const spans = Array.from(el.querySelectorAll('span'));
-        const mainSpan = spans.find(s => s.textContent.trim().length > 10 && !s.querySelector('span'));
+      // Trouver tous les spans feuilles (sans enfants span) portant du texte
+      const allSpans = Array.from(currentTarget.querySelectorAll('span'));
+      const textSpans = allSpans.filter(s =>
+        s.textContent.trim().length > 2 && !s.querySelector('span')
+      );
 
-        if (mainSpan && spans.length <= 3) {
-          mainSpan.innerHTML = linesToHtml(lines);
-        } else {
-          const imgs = Array.from(el.querySelectorAll('img')).map(i => i.cloneNode(true));
-          el.innerHTML = linesToHtml(lines);
-          imgs.forEach(img => el.appendChild(img));
-        }
+      if (textSpans.length === 0) {
+        // Pas de span — réécriture directe du <p>/<td>
+        currentTarget.innerHTML = linesToHtml(lines);
+      } else if (textSpans.length === 1) {
+        // Un seul span porteur
+        textSpans[0].innerHTML = linesToHtml(lines);
+      } else {
+        // Plusieurs spans → réécrire le plus long (contenu principal)
+        const mainSpan = textSpans.reduce((a, b) =>
+          a.textContent.length > b.textContent.length ? a : b
+        );
+        mainSpan.innerHTML = linesToHtml(lines);
       }
-
-      applyText(currentTarget, raw);
     }
     if (currentType === 'image' && pendingImageB64 && currentTarget) {
       currentTarget.src = pendingImageB64;
     }
     closePopup();
-  });
+  });;
 
   // ── Fermer popup ───────────────────────────────────────
   function closePopup() {
@@ -476,16 +477,20 @@ body.admin-mode [data-img-editable]:hover {
   async function saveToGitHub() {
     toast('⏳ Sauvegarde en cours…', 60000);
 
-    // 1. Récupérer le HTML actuel de la page (sans les attributs data-editable ajoutés)
-    const clone = document.documentElement.cloneNode(true);
-
-    // Nettoyer les attributs admin
-    clone.querySelectorAll('[data-editable]').forEach(el => el.removeAttribute('data-editable'));
-    clone.querySelectorAll('[data-img-editable]').forEach(el => el.removeAttribute('data-img-editable'));
-    clone.querySelectorAll('#admin-bar').forEach(el => el.style.display = 'none');
-    clone.querySelector('body').classList.remove('admin-mode');
-
-    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
+    // 1. Sérialiser le HTML courant, nettoyer via regex (indépendant du DOM live)
+    let htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    // Retirer les attributs data-editable et data-img-editable
+    htmlContent = htmlContent.replace(/ data-editable="1"/g, '');
+    htmlContent = htmlContent.replace(/ data-img-editable="1"/g, '');
+    // Cacher la barre admin dans le HTML sauvegardé
+    htmlContent = htmlContent.replace(
+      'id="admin-bar" style="display: block;"',
+      'id="admin-bar" style="display: none;"'
+    );
+    htmlContent = htmlContent.replace(
+      '<body class="admin-mode"',
+      '<body'
+    );
     const b64 = btoa(unescape(encodeURIComponent(htmlContent)));
     const ts  = timestamp();
 
