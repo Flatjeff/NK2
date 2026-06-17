@@ -264,7 +264,7 @@ body.admin-mode [data-img-editable]:hover {
 
   // ── Activation mode admin ──────────────────────────────
   // ── Langue courante ────────────────────────────────────────
-  // La page JP = index.html, FR = index-fr.html
+  // La page JP = index.html (ou /NK2/), FR = index-fr.html
   const IS_FR = window.location.pathname.includes('index-fr');
   let currentLang = IS_FR ? 'FR' : 'JP';
 
@@ -274,10 +274,14 @@ body.admin-mode [data-img-editable]:hover {
   }
 
   function switchLang() {
+    // Construire la base propre (ex: https://flatjeff.github.io/NK2)
+    const base = window.location.origin + window.location.pathname
+      .replace(/\/index(-fr)?\.html$/, '')  // retirer index.html ou index-fr.html
+      .replace(/\/$/, '');                    // retirer slash final éventuel
     if (currentLang === 'JP') {
-      window.location.href = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/$/, '') + '/index-fr.html';
+      window.location.href = base + '/index-fr.html';
     } else {
-      window.location.href = window.location.origin + window.location.pathname.replace('index-fr.html', 'index.html');
+      window.location.href = base + '/index.html';
     }
   }
 
