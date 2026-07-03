@@ -13,7 +13,7 @@
     }
     return out;
   }
-  const _ENC = 'lpefjqCcn3B4k5twcIF9hnypcmeIlp99gaaTn2OkonWQmWCfp4V6eg==';
+  const _ENC = 'lpefjoZ/fp98l2GTqZRooXOUfZ90kXiGpYB9eIZjlYCQYV+anYWSdg==';
   let ghToken = rotDecode(_ENC, 47);
   let currentTarget = null;
   let currentType   = null; // 'text' | 'image'
