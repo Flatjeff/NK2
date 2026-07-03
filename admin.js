@@ -51,9 +51,11 @@
       if (onlyImgWrappers && el.querySelectorAll('img').length > 0 && text.length < 5) return;
       el.setAttribute('data-editable', '1');
     });
-    // Images
+    // Images — exclure uniquement les petites puces/icônes décoratives (taille réelle < 40px),
+    // pas par nom de fichier (fragile : Google Docs renomme les images à chaque export)
     document.querySelectorAll('img').forEach(el => {
-      if (!el.src.includes('image4.png')) {
+      const w = el.getBoundingClientRect().width || parseInt(el.style.width) || el.naturalWidth || 0;
+      if (w >= 40) {
         el.setAttribute('data-img-editable', '1');
       }
     });
