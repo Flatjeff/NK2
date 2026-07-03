@@ -235,7 +235,7 @@
       imgs.forEach(img => currentTarget.appendChild(img));
     }
     if (currentType === 'image' && pendingImageB64 && currentTarget) {
-      currentTarget.src = pendingImageB64;
+      currentTarget.setAttribute('src', pendingImageB64);
     }
     closePopup();
   });;
