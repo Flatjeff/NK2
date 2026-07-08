@@ -151,7 +151,9 @@
       return out;
     }
 
-    const plainText = extractText(el).replace(/\n{3,}/g, '\n\n').trim();
+    // On préserve les sauts de ligne exactement tels qu'ils sont dans le HTML
+    // (pas de compression ni de trim) pour laisser le contrôle total de l'espacement.
+    const plainText = extractText(el);
 
     document.getElementById('admin-popup-title').textContent = 'Éditer le texte';
     document.getElementById('admin-popup-body').innerHTML =
@@ -227,7 +229,9 @@
   // ── Valider ────────────────────────────────────────────
   document.getElementById('admin-validate').addEventListener('click', () => {
     if (currentType === 'text' && currentTarget) {
-      const raw = document.getElementById('admin-textarea').value.trim();
+      // Pas de trim() : on préserve les lignes vides en début/fin ajoutées volontairement
+      // pour l'espacement (chaque ligne vide devient un <br> dans le HTML final).
+      const raw = document.getElementById('admin-textarea').value;
       const lines = raw.split('\n');
 
       function linesToHtml(lines) {
