@@ -180,6 +180,10 @@
       <img id="admin-img-preview" src="${img.src}">
       <input type="file" id="admin-img-input" accept="image/*">
       <button id="admin-img-btn">📁 Choisir une image</button>
+      <div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #eee;padding-top:14px;">
+        <button id="admin-img-duplicate" style="flex:1;background:#2980b9;color:#fff;border:none;border-radius:4px;padding:8px 12px;font:700 12px Arial,sans-serif;cursor:pointer;">🗐 Dupliquer (ajouter en dessous)</button>
+        <button id="admin-img-delete" style="flex:1;background:#c0392b;color:#fff;border:none;border-radius:4px;padding:8px 12px;font:700 12px Arial,sans-serif;cursor:pointer;">🗑 Supprimer cette image</button>
+      </div>
     `;
 
     document.getElementById('admin-img-btn').addEventListener('click', () => {
@@ -196,6 +200,25 @@
         document.getElementById('admin-img-preview').src = pendingImageB64;
       };
       reader.readAsDataURL(file);
+    });
+
+    // ── Dupliquer : clone le bloc <p> contenant l'image, l'insère juste après ──
+    document.getElementById('admin-img-duplicate').addEventListener('click', () => {
+      const block = img.closest('p') || img.closest('td') || img;
+      const clone = block.cloneNode(true);
+      block.insertAdjacentElement('afterend', clone);
+      tagEditables(); // s'assurer que le clone est bien marqué éditable
+      toast('✅ Image dupliquée — pense à la remplacer si besoin');
+      closePopup();
+    });
+
+    // ── Supprimer : retire le bloc <p> contenant l'image ──
+    document.getElementById('admin-img-delete').addEventListener('click', () => {
+      if (!confirm('Supprimer définitivement cette image de la page ?')) return;
+      const block = img.closest('p') || img.closest('td') || img;
+      block.remove();
+      toast('🗑 Image supprimée');
+      closePopup();
     });
 
     document.getElementById('admin-overlay').classList.add('open');
