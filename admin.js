@@ -43,6 +43,13 @@
       if (text.length < 2) return;
       // Exclure les éléments de l'UI admin
       if (el.closest('#admin-bar, #admin-overlay, #admin-toast')) return;
+      // Empêcher un <td> (ou tout conteneur) qui contient déjà des <p> distincts d'être
+      // lui-même éditable : cela créerait une ambiguïté de clic et fusionnerait plusieurs
+      // paragraphes ayant des styles différents (ex. titre + questions/réponses) en un seul bloc.
+      if (el.tagName === 'TD') {
+        const innerParas = Array.from(el.querySelectorAll('p')).filter(p => p.textContent.trim().length >= 2);
+        if (innerParas.length > 1) return; // laisser les <p> internes être les cibles d'édition
+      }
       // Exclure si ne contient que des images (wrappers visuels)
       const allNodes = Array.from(el.querySelectorAll('*'));
       const onlyImgWrappers = allNodes.every(n =>
